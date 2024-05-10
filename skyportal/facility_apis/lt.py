@@ -344,6 +344,73 @@ class LTAPI(FollowUpAPI):
     """An interface to LT operations."""
 
     @staticmethod
+    def submit_request(request, session, payload, **kwargs):
+        """
+        Submit a follow-up request to LT.
+
+        Parameters
+        ----------
+        request: skyportal.models.FollowupRequest
+            The request to add to the queue and the SkyPortal database.
+        session: sqlalchemy.Session
+            Database session for this transaction
+        payload: etree.Element
+            payload for LT requests.
+        kwargs: dict
+            refresh_source: bool
+                Refresh source after request submission.
+            refresh_requests: bool
+                Refresh follow-up requests after request submission.
+        """
+        from ..models import FacilityTransaction
+
+        altdata = request.allocation.altdata
+        if not altdata:
+            raise ValueError('Missing allocation information.')
+        headers = {
+            'Username': altdata["username"],
+            'Password': altdata["password"],
+        }
+        url = f"http://{cfg['app.lt_host']}:{cfg['app.lt_port']}/node_agent2/node_agent?wsdl"
+        client = Client(url=url, headers=headers)
+        full_payload = etree.tostring(payload, encoding="unicode", pretty_print=True)
+        # Send payload, and receive response string, removing the encoding tag which causes issue with lxml parsing
+        response = client.service.handle_rtml(full_payload).replace(
+            'encoding="ISO-8859-1"', ''
+        )
+        response_rtml = etree.fromstring(response)
+        mode = response_rtml.get('mode')
+
+        if mode == 'confirm':
+            request.status = 'submitted'
+        else:
+            error = list(response_rtml.iter('{http://www.rtml.org/v3.1a}Error'))[0].text
+            request.status = f'rejected: {error}'
+
+        transaction = FacilityTransaction(
+            request=http.serialize_requests_request_xml(full_payload),
+            response=http.serialize_requests_response_xml(response),
+            followup_request=request,
+            initiator_id=request.last_modified_by_id,
+        )
+
+        session.add(transaction)
+
+        if kwargs.get('refresh_source', False):
+            flow = Flow()
+            flow.push(
+                '*',
+                'skyportal/REFRESH_SOURCE',
+                payload={'obj_key': request.obj.internal_key},
+            )
+        if kwargs.get('refresh_requests', False):
+            flow = Flow()
+            flow.push(
+                request.last_modified_by_id,
+                'skyportal/REFRESH_FOLLOWUP_REQUESTS',
+            )
+
+    @staticmethod
     def delete(request, session, **kwargs):
         """Delete a follow-up request from LT queue (all instruments).
 
@@ -446,59 +513,8 @@ class IOOAPI(LTAPI):
         session: sqlalchemy.Session
             Database session for this transaction
         """
-
-        from ..models import FacilityTransaction
-
-        altdata = request.allocation.altdata
-        if not altdata:
-            raise ValueError('Missing allocation information.')
-        ltreq = IOOIOIRequest("IO:O", request)
-        observation_payload = ltreq.observation_payload
-
-        headers = {
-            'Username': altdata["username"],
-            'Password': altdata["password"],
-        }
-        url = f"http://{cfg['app.lt_host']}:{cfg['app.lt_port']}/node_agent2/node_agent?wsdl"
-        client = Client(url=url, headers=headers)
-        full_payload = etree.tostring(
-            observation_payload, encoding="unicode", pretty_print=True
-        )
-        # Send payload, and receive response string, removing the encoding tag which causes issue with lxml parsing
-        response = client.service.handle_rtml(full_payload).replace(
-            'encoding="ISO-8859-1"', ''
-        )
-        response_rtml = etree.fromstring(response)
-        mode = response_rtml.get('mode')
-
-        if mode == 'confirm':
-            request.status = 'submitted'
-        else:
-            error = list(response_rtml.iter('{http://www.rtml.org/v3.1a}Error'))[0].text
-            request.status = f'rejected: {error}'
-
-        transaction = FacilityTransaction(
-            request=http.serialize_requests_request_xml(full_payload),
-            response=http.serialize_requests_response_xml(response),
-            followup_request=request,
-            initiator_id=request.last_modified_by_id,
-        )
-
-        session.add(transaction)
-
-        if kwargs.get('refresh_source', False):
-            flow = Flow()
-            flow.push(
-                '*',
-                'skyportal/REFRESH_SOURCE',
-                payload={'obj_key': request.obj.internal_key},
-            )
-        if kwargs.get('refresh_requests', False):
-            flow = Flow()
-            flow.push(
-                request.last_modified_by_id,
-                'skyportal/REFRESH_FOLLOWUP_REQUESTS',
-            )
+        observation_payload = IOOIOIRequest("IO:O", request).observation_payload
+        LTAPI.submit_request(request, session, observation_payload, **kwargs)
 
     form_json_schema = {
         "type": "object",
@@ -597,59 +613,8 @@ class IOIAPI(LTAPI):
         session: sqlalchemy.Session
             Database session for this transaction
         """
-
-        from ..models import FacilityTransaction
-
-        altdata = request.allocation.altdata
-        if not altdata:
-            raise ValueError('Missing allocation information.')
-        ltreq = IOOIOIRequest("IO:I", request)
-        observation_payload = ltreq.observation_payload
-
-        headers = {
-            'Username': altdata["username"],
-            'Password': altdata["password"],
-        }
-        url = f"http://{cfg['app.lt_host']}:{cfg['app.lt_port']}/node_agent2/node_agent?wsdl"
-        client = Client(url=url, headers=headers)
-        full_payload = etree.tostring(
-            observation_payload, encoding="unicode", pretty_print=True
-        )
-        # Send payload, and receive response string, removing the encoding tag which causes issue with lxml parsing
-        response = client.service.handle_rtml(full_payload).replace(
-            'encoding="ISO-8859-1"', ''
-        )
-        response_rtml = etree.fromstring(response)
-        mode = response_rtml.get('mode')
-
-        if mode == 'confirm':
-            request.status = 'submitted'
-        else:
-            error = list(response_rtml.iter('{http://www.rtml.org/v3.1a}Error'))[0].text
-            request.status = f'rejected: {error}'
-
-        transaction = FacilityTransaction(
-            request=http.serialize_requests_request_xml(full_payload),
-            response=http.serialize_requests_response_xml(response),
-            followup_request=request,
-            initiator_id=request.last_modified_by_id,
-        )
-
-        session.add(transaction)
-
-        if kwargs.get('refresh_source', False):
-            flow = Flow()
-            flow.push(
-                '*',
-                'skyportal/REFRESH_SOURCE',
-                payload={'obj_key': request.obj.internal_key},
-            )
-        if kwargs.get('refresh_requests', False):
-            flow = Flow()
-            flow.push(
-                request.last_modified_by_id,
-                'skyportal/REFRESH_FOLLOWUP_REQUESTS',
-            )
+        observation_payload = IOOIOIRequest("IO:I", request).observation_payload
+        LTAPI.submit_request(request, session, observation_payload, **kwargs)
 
     form_json_schema = {
         "type": "object",
@@ -747,60 +712,8 @@ class SPRATAPI(LTAPI):
         session: sqlalchemy.Session
             Database session for this transaction
         """
-
-        from ..models import FacilityTransaction
-
-        altdata = request.allocation.altdata
-        if not altdata:
-            raise ValueError('Missing allocation information.')
-
-        ltreq = SPRATRequest(request)
-        observation_payload = ltreq.observation_payload
-
-        headers = {
-            'Username': altdata["username"],
-            'Password': altdata["password"],
-        }
-        url = f"http://{cfg['app.lt_host']}:{cfg['app.lt_port']}/node_agent2/node_agent?wsdl"
-        client = Client(url=url, headers=headers)
-        full_payload = etree.tostring(
-            observation_payload, encoding="unicode", pretty_print=True
-        )
-        # Send payload, and receive response string, removing the encoding tag which causes issue with lxml parsing
-        response = client.service.handle_rtml(full_payload).replace(
-            'encoding="ISO-8859-1"', ''
-        )
-        response_rtml = etree.fromstring(response)
-        mode = response_rtml.get('mode')
-
-        if mode == 'confirm':
-            request.status = 'submitted'
-        else:
-            error = list(response_rtml.iter('{http://www.rtml.org/v3.1a}Error'))[0].text
-            request.status = f'rejected: {error}'
-
-        transaction = FacilityTransaction(
-            request=http.serialize_requests_request_xml(full_payload),
-            response=http.serialize_requests_response_xml(response),
-            followup_request=request,
-            initiator_id=request.last_modified_by_id,
-        )
-
-        session.add(transaction)
-
-        if kwargs.get('refresh_source', False):
-            flow = Flow()
-            flow.push(
-                '*',
-                'skyportal/REFRESH_SOURCE',
-                payload={'obj_key': request.obj.internal_key},
-            )
-        if kwargs.get('refresh_requests', False):
-            flow = Flow()
-            flow.push(
-                request.last_modified_by_id,
-                'skyportal/REFRESH_FOLLOWUP_REQUESTS',
-            )
+        observation_payload = SPRATRequest(request).observation_payload
+        LTAPI.submit_request(request, session, observation_payload, **kwargs)
 
     form_json_schema = {
         "type": "object",
