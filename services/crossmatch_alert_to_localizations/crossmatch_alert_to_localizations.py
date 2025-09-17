@@ -4,13 +4,12 @@ from datetime import datetime, timedelta
 import astropy.units as u
 import sqlalchemy as sa
 from astropy.time import Time
-from models import Photometry
 from sqlalchemy import and_
 
 from baselayer.app.env import load_env
 from baselayer.app.models import init_db
 from baselayer.log import make_log
-from skyportal.models import DBSession, GcnTag, Obj
+from skyportal.models import DBSession, GcnTag, Obj, Photometry
 from skyportal.utils.localization import get_localizations
 from skyportal.utils.services import check_loaded
 
