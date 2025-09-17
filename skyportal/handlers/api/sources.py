@@ -20,10 +20,7 @@ from skyportal.models import (
     Comment,
     Galaxy,
     Group,
-    Localization,
-    LocalizationTile,
     Obj,
-    ObjTag,
     PhotStat,
     Source,
     SourceLabel,
@@ -34,6 +31,7 @@ from skyportal.models import (
 
 from ...utils.cache import Cache, array_to_bytes
 from ...utils.calculations import radec2lb
+from ...utils.localization import get_localization
 
 _, cfg = load_env()
 cache_dir = "cache/sources_queries"
@@ -373,57 +371,6 @@ def create_annotation_query(
     return None, None
 
 
-def get_localization(localization_dateobs, localization_name, session):
-    startTime = time.time()
-    localization_dateobs_str = localization_dateobs.strftime("%Y-%m-%d %H:%M:%S")
-    if localization_name is None:
-        localization_id = session.scalars(
-            sa.select(Localization.id)
-            .where(Localization.dateobs == localization_dateobs_str)
-            .order_by(Localization.created_at.desc())
-        ).first()
-    else:
-        localization_id = session.scalars(
-            sa.select(Localization.id)
-            .where(Localization.dateobs == localization_dateobs_str)
-            .where(Localization.localization_name == localization_name)
-            .order_by(Localization.modified.desc())
-        ).first()
-    if localization_id is None:
-        if localization_name is not None:
-            raise ValueError(
-                f"Localization {localization_dateobs_str} with name {localization_name} not found",
-            )
-        else:
-            raise ValueError(
-                f"Localization {localization_dateobs_str} not found",
-            )
-
-    partition_key = localization_dateobs
-    localizationtile_partition_name = f"{partition_key.year}_{partition_key.month:02d}"
-    localizationtilescls = LocalizationTile.partitions.get(
-        localizationtile_partition_name, None
-    )
-    if localizationtilescls is None:
-        localizationtilescls = LocalizationTile.partitions.get("def", LocalizationTile)
-    else:
-        if not (
-            session.scalars(
-                sa.select(localizationtilescls.id).where(
-                    localizationtilescls.localization_id == localization_id
-                )
-            ).first()
-        ):
-            localizationtilescls = LocalizationTile.partitions.get(
-                "def", LocalizationTile
-            )
-
-    endTime = time.time()
-    log_verbose(f"get_localization took {endTime - startTime} seconds")
-
-    return localization_id, localizationtilescls.__tablename__
-
-
 def get_luminosity_distance(obj):
     """
     The luminosity distance in Mpc, using either DM or distance data
@@ -485,7 +432,6 @@ async def get_sources(
     include_tags=True,
     exclude_forced_photometry=False,
     require_detections=False,
-    is_token_request=False,
     include_requested=False,
     requested_only=False,
     include_color_mag=False,
