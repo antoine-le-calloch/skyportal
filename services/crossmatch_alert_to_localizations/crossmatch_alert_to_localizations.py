@@ -44,8 +44,8 @@ def get_objs_created_after(session, created_after, snr_threshold):
     for obj in objs:
         # Check if the first detection was within the last day
         if (
-            obj.photometries
-            and min(obj.photometries, key=lambda p: p.mjd) >= mjd_1day_ago
+            obj.photometry
+            and min(obj.photometry, key=lambda p: p.mjd).mjd >= mjd_1day_ago
         ):
             filtered_objs.append(obj)
     return filtered_objs
