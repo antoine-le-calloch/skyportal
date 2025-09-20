@@ -105,18 +105,16 @@ def get_localizations(session, dateobs, cumulative_probability):
         A list of tuples, each containing a localization ID and its corresponding MOC.
     """
     # get the events since dateobs, that have a tag "GW"
-    stmt = sa.select(GcnTag.dateobs).where(
-        GcnTag.text == "GW", GcnTag.dateobs >= dateobs
-    )
-    gw_dateobs = session.scalars(stmt).all()
+    gw_dateobs = session.scalars(
+        sa.select(GcnTag.dateobs).where(GcnTag.text == "GW", GcnTag.dateobs >= dateobs)
+    ).all()
     if len(gw_dateobs) == 0:
         return []
-    stmt = (
+    localizations = session.scalars(
         sa.select(Localization)
         .where(Localization.dateobs.in_(gw_dateobs))
         .order_by(Localization.dateobs.desc())
-    )
-    localizations = session.scalars(stmt).all()
+    ).all()
 
     results = []
     for loc in localizations:
