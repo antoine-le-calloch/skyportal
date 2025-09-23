@@ -183,14 +183,7 @@ def service(*args, **kwargs):
                 session, latest_gcn_date_obs, get_first_only=True
             )
 
-            # If no new GCNs, check for expired localizations and remove them
-            if not new_latest_gcn_dateobs and localizations:
-                for dateobs, _ in localizations:
-                    if dateobs < datetime.utcnow() - timedelta(days=fallback_in_days):
-                        localizations.remove((dateobs, _))
-                        print(f"Removed expired localization {dateobs}")
-
-            if localizations is None or new_latest_gcn_dateobs:
+            if new_latest_gcn_dateobs:
                 # If new GCNs, fetch again localizations from the last 2 days
                 log(f"New GCNs found, fetching skymaps")
                 start_time = time.time()
@@ -202,9 +195,16 @@ def service(*args, **kwargs):
                 log_verbose(
                     f"Fetching {len(localizations)} localizations and creating MOCs took {time.time() - start_time:.2f} seconds"
                 )
+                latest_gcn_date_obs = new_latest_gcn_dateobs
 
-                if new_latest_gcn_dateobs:
-                    latest_gcn_date_obs = new_latest_gcn_dateobs
+            # If no new GCNs, check for expired localizations and remove them
+            elif localizations:
+                for dateobs, moc in localizations.copy():
+                    if dateobs >= datetime.utcnow() - timedelta(days=fallback_in_days):
+                        break
+                    else:
+                        print(f"Removed expired skymap {dateobs}")
+                        localizations.remove((dateobs, moc))
 
             # Retrieve objects created after last object creation time
             if localizations:
