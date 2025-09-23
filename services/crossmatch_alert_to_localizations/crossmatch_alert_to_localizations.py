@@ -200,9 +200,7 @@ def service(*args, **kwargs):
             # If no new GCNs, check for expired localizations and remove them
             elif localizations:
                 for dateobs, moc in localizations.copy():
-                    if dateobs >= datetime.utcnow() - timedelta(days=fallback_in_days):
-                        break
-                    else:
+                    if dateobs < datetime.utcnow() - timedelta(days=fallback_in_days):
                         print(f"Removed expired skymap {dateobs}")
                         localizations.remove((dateobs, moc))
 
