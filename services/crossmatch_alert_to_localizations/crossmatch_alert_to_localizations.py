@@ -28,9 +28,9 @@ log = make_log("crossmatch_alert_to_localizations")
 log_verbose = make_log("crossmatch_alert_to_localizations_verbose")
 init_db(**cfg["database"])
 
-GCN = 480000  # hours for GCN fallback
-ALERT = 480000  # hours for alert fallback
-FIRST_DETECTION = 480000  # hours for first detection fallback
+GCN = 48  # hours for GCN fallback
+ALERT = 2  # hours for alert fallback
+FIRST_DETECTION = 48  # hours for first detection fallback
 
 
 def fallback(hours=0, date_format=None):
