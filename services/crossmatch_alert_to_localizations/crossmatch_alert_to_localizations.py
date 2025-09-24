@@ -28,7 +28,16 @@ log = make_log("crossmatch_alert_to_localizations")
 log_verbose = make_log("crossmatch_alert_to_localizations_verbose")
 init_db(**cfg["database"])
 
-fallback_in_days = 2
+GCN = 480000  # hours for GCN fallback
+ALERT = 480000  # hours for alert fallback
+FIRST_DETECTION = 480000  # hours for first detection fallback
+
+
+def fallback(hours=0, date_format=None):
+    date = datetime.utcnow() - timedelta(hours=hours)
+    if date_format == "mjd":
+        return Time(date).mjd
+    return date
 
 
 def is_obj_in_localizations(ra, dec, localizations):
@@ -51,18 +60,19 @@ def get_objs_created_after(session, created_after, snr_threshold):
                 (Photometry.flux / Photometry.fluxerr) > snr_threshold,
             )
         )
+        .distinct(Obj.id)
     ).all()
-    fallback_in_mjd = Time(datetime.utcnow() - timedelta(days=fallback_in_days)).mjd
+    fallback_mjd = fallback(FIRST_DETECTION, date_format="mjd")
     filtered_objs = []
     for obj in objs:
-        # Check if the first detection was within the last day
+        # Check if the first detection was within the fallback period
         if (
             obj.photometry
-            and min(obj.photometry, key=lambda p: p.mjd).mjd >= fallback_in_mjd
+            and min(obj.photometry, key=lambda p: p.mjd).mjd >= fallback_mjd
         ):
             filtered_objs.append(obj)
-    if filtered_objs:
-        print(
+    if objs:
+        log_verbose(
             f"Found {len(filtered_objs)} valid objects on {len(objs)} in {time.time() - start_time:.2f} seconds"
         )
     return filtered_objs
@@ -161,18 +171,17 @@ def get_localizations(session, dateobs, cumulative_probability):
             WHERE lt.cum_prob <= {cumulative_probability}
         """
         tiles = session.execute(sa.text(stmt)).all()
-        if len(tiles) == 0:
-            continue
-        healpix_list = [[tile.healpix.lower, tile.healpix.upper] for tile in tiles]
-        moc = MOC.from_depth29_ranges(29, ranges=np.array(healpix_list))
-        results.append((loc.dateobs, moc))
+        if tiles:
+            healpix_list = [[tile.healpix.lower, tile.healpix.upper] for tile in tiles]
+            moc = MOC.from_depth29_ranges(29, ranges=np.array(healpix_list))
+            results.append((loc.dateobs, moc))
     return results
 
 
 @check_loaded(logger=log)
 def service(*args, **kwargs):
-    latest_gcn_date_obs = datetime.utcnow() - timedelta(days=fallback_in_days)
-    latest_obj_created_time = datetime.utcnow() - timedelta(hours=2)
+    latest_gcn_date_obs = fallback(GCN)
+    latest_obj_created_time = fallback(ALERT)
     cumulative_probability = 0.95
     snr_threshold = 5.0  # Minimum SNR for photometry to consider an object
     localizations = None
@@ -185,11 +194,11 @@ def service(*args, **kwargs):
 
             if new_latest_gcn_dateobs:
                 # If new GCNs, fetch again localizations from the last 2 days
-                log(f"New GCNs found, fetching skymaps")
+                log_verbose(f"New GCNs found, fetching skymaps")
                 start_time = time.time()
                 localizations = get_localizations(
                     session,
-                    datetime.utcnow() - timedelta(days=fallback_in_days),
+                    fallback(GCN),
                     cumulative_probability,
                 )
                 log_verbose(
@@ -199,22 +208,19 @@ def service(*args, **kwargs):
 
             # If no new GCNs, check for expired localizations and remove them
             elif localizations:
-                fallback = datetime.utcnow() - timedelta(days=fallback_in_days)
+                gcn_fallback = fallback(GCN)
                 # Iterate in reverse to get older items first
                 for dateobs, moc in reversed(localizations.copy()):
-                    if dateobs >= fallback.isoformat():
+                    if dateobs >= gcn_fallback:
                         break
-                    print(f"Removed expired localization {dateobs}")
+                    log_verbose(f"Removed expired localization {dateobs}")
                     localizations.remove((dateobs, moc))
 
             # Retrieve objects created after last object creation time
             if localizations:
                 objs = get_objs_created_after(
                     session,
-                    max(
-                        latest_obj_created_time,
-                        datetime.utcnow() - timedelta(days=fallback_in_days),
-                    ),
+                    max(latest_obj_created_time, fallback(ALERT)),
                     snr_threshold,
                 )
                 crossmatches = []
@@ -228,18 +234,21 @@ def service(*args, **kwargs):
                             {"obj": obj, "localizations": matching_localizations}
                         )
                         # TODO: Do something with the object, e.g., publish somewhere
+                        log(
+                            f"Found {len(matching_localizations)} matching localizations with {obj.id}"
+                        )
                         log_verbose(
                             f"{obj.id} in localizations {matching_localizations}"
                         )
                 if objs:
                     log_verbose(
-                        f"{datetime.utcnow()} Found {len(crossmatches)} crossmatches in {time.time() - start_time:.2f} seconds\n"
+                        f"Found {len(crossmatches)} crossmatches in {time.time() - start_time:.2f} seconds"
                     )
-                    last_obj_created_time = max(
-                        last_obj_created_time, max(obj.created_at for obj in objs)
+                    latest_obj_created_time = max(
+                        latest_obj_created_time, max(obj.created_at for obj in objs)
                     )
             else:
-                print("No skymaps available. Waiting...")
+                log("No skymaps available. Waiting...")
         time.sleep(20)
 
 
