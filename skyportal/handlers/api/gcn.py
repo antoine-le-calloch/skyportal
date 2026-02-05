@@ -1357,7 +1357,7 @@ class GcnEventHandler(BaseHandler):
 
     @auth_or_token
     async def get(self, dateobs=None):
-        f"""
+        """
         ---
         single:
           summary: Get a GCN Event
