@@ -419,6 +419,18 @@
   telescope_id: =ATLAS
   type: imager
   filters: ['atlasc', 'atlaso']
+- band: optical
+  name: LSST
+  telescope_id: =Rubin
+  type: imager
+  =id: LSST
+  api_classname: GENERICAPI
+  api_classname_obsplan: MMAAPI
+  filters: [ "lsstu", "lsstg", "lsstr", "lssti", "lsstz", "lssty" ]
+  # field_data:
+  #   file: ../data/LSST_Fields.csv
+  field_fov_type: rectangle
+  field_fov_attributes: [3.113, 3.113]
 - =id: PGIR
   band: NIR
   filters:
