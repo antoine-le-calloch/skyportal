@@ -421,7 +421,7 @@
   filters: ['atlasc', 'atlaso']
 - band: optical
   name: LSST
-  telescope_id: =Rubin
+  telescope_id: =Simonyi
   type: imager
   =id: LSST
   api_classname: GENERICAPI
