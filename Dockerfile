@@ -52,6 +52,9 @@ RUN bash -c "\
     mkdir -p /skyportal/persistentdata/analysis && \
     chown -R skyportal.skyportal /skyportal/persistentdata/analysis && \
     \
+    mkdir -p /skyportal/persistentdata/comments && \
+    chown -R skyportal.skyportal /skyportal/persistentdata/comments && \
+    \
     mkdir -p /skyportal/persistentdata/dustmap && \
     chown -R skyportal.skyportal /skyportal/persistentdata/dustmap && \
     \
