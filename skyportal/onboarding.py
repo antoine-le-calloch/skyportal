@@ -183,6 +183,12 @@ def setup_invited_user_permissions(strategy, uid, details, user, *args, **kwargs
 
     if public_group is not None and public_group not in invitation.groups:
         DBSession().add(GroupUser(group_id=public_group.id, user_id=user.id))
+        if public_group.streams:
+            for stream in public_group.streams:
+                if stream.id not in stream_ids:
+                    DBSession().add(
+                        StreamUser(stream_id=stream.id, user_id=user.id)
+                    )
 
     invitation.used = True
     DBSession().commit()
