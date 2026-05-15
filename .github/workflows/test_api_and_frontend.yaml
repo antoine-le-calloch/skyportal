@@ -50,10 +50,6 @@ jobs:
           ]
 
     steps:
-      - uses: "MercuryTechnologies/delete-cancelled-runs@f5c9d322d9c7afbd41f779199818c1ffe381d34b" #v1.0.0
-        with:
-          workflow-file: "test_api_and_frontend.yaml"
-
       - name: Checkout branch being tested
         uses: actions/checkout@v4
         with:
