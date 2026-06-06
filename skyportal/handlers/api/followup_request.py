@@ -1243,6 +1243,12 @@ class FollowupRequestHandler(BaseHandler):
             except ValueError:
                 return self.error("Allocation ID must be an integer.")
 
+        if instrumentID is not None:
+            try:
+                instrumentID = int(instrumentID)
+            except ValueError:
+                return self.error("Instrument ID must be an integer.")
+
         with self.Session() as session:
             if allocationID is not None:
                 # verify that the user can access the allocation
