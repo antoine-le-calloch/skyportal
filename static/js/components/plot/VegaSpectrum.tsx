@@ -71,6 +71,7 @@ const spec = (
         field: "observed_at",
         type: "nominal",
         legend: {
+          title: "Observed at",
           orient: legendOrient,
           titleFontSize,
           labelFontSize,
