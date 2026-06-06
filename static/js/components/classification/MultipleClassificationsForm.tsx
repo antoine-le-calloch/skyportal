@@ -13,6 +13,7 @@ import AccordionDetails from "@mui/material/AccordionDetails";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Paper from "@mui/material/Paper";
 import Chip from "@mui/material/Chip";
+import Box from "@mui/material/Box";
 import { makeStyles } from "tss-react/mui";
 import { withStyles } from "tss-react/mui";
 import { showNotification } from "baselayer/components/Notifications";
@@ -34,7 +35,7 @@ const useStyles = makeStyles()(() => ({
     padding: "1rem",
   },
   taxonomySelect: {
-    minWidth: "10rem",
+    minWidth: "12rem",
     margin: "0.25rem 0",
   },
   sliderContainer: {
@@ -406,7 +407,15 @@ const MultipleClassificationsForm = ({
   return (
     <div className={classes.container}>
       <Typography variant="h6">Post Classifications</Typography>
-      <div>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
+          my: 0.5,
+          gap: 0.5,
+        }}
+      >
         <Typography variant="subtitle2">
           Classifications to be posted:
         </Typography>
@@ -418,15 +427,13 @@ const MultipleClassificationsForm = ({
             />
           ),
         )}
-      </div>
+      </Box>
       <FormControl className={classes.taxonomySelect}>
-        <InputLabel id={`taxonomy-select-label-${objId}`}>
-          Select Taxonomy
-        </InputLabel>
+        <InputLabel>Select Taxonomy</InputLabel>
         <Select
-          labelId={`taxonomy-select-label-${objId}`}
-          inputProps={{ MenuProps: { disableScrollLock: true } }}
+          label="Select Taxonomy"
           id={`taxonomy-select-${objId}`}
+          inputProps={{ MenuProps: { disableScrollLock: true } }}
           value={selectedTaxonomy || ""}
           onChange={handleSelectTaxonomy}
         >
