@@ -191,7 +191,7 @@ const SurveyEfficiencyObservationPlanLists = ({
 
   return (
     <div className={classes.container}>
-      <Accordion className={classes.accordion} key="instrument_table_div">
+      <Accordion className={classes.accordion}>
         <AccordionSummary
           expandIcon={<ExpandMoreIcon />}
           aria-controls="survey-efficiency-requests"

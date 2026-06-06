@@ -90,15 +90,13 @@ const EarthquakeMeasurementLists = ({
           <AccordionSummary
             expandIcon={<ExpandMoreIcon />}
             aria-controls={`${mmadetectorLookUp[mmadetector_id].name}-requests`}
-            data-testid={`${mmadetectorLookUp[mmadetector_id].name}-requests-header`}
+            data-testid={`${mmadetector_id}-requests-header`}
           >
             <Typography variant="subtitle1">
               {mmadetectorLookUp[mmadetector_id].name} Requests
             </Typography>
           </AccordionSummary>
-          <AccordionDetails
-            data-testid={`${mmadetectorLookUp[mmadetector_id].name}_measurementsTable`}
-          >
+          <AccordionDetails data-testid={`${mmadetector_id}_measurementsTable`}>
             <StyledDataGrid
               autoHeight
               rows={analysesGroupedByMMADetectorId[mmadetector_id]}

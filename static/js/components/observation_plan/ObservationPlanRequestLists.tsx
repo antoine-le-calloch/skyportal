@@ -575,14 +575,14 @@ const ObservationPlanRequestLists = ({
     >
       <AccordionSummary
         expandIcon={<ExpandMoreIcon />}
-        data-testid={`${instLookUp[instrument_id].name}-requests-header`}
+        data-testid={`${instrument_id}-requests-header`}
       >
         <Typography variant="subtitle1">
           {instLookUp[instrument_id].name} Requests
         </Typography>
       </AccordionSummary>
       <AccordionDetails
-        data-testid={`${instLookUp[instrument_id].name}_observationplanRequestsTable`}
+        data-testid={`${instrument_id}_observationplanRequestsTable`}
       >
         <StyledDataGrid
           autoHeight
