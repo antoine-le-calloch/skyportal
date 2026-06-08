@@ -1333,6 +1333,12 @@ class FollowupRequestHandler(BaseHandler):
                     obj_subquery, FollowupRequest.obj_id == obj_subquery.c.id
                 )
             if allocationID:
+                try:
+                    allocationID = int(allocationID)
+                except (TypeError, ValueError):
+                    return self.error(
+                        f"Invalid allocationID: {allocationID}; must be an integer"
+                    )
                 followup_requests = followup_requests.where(
                     FollowupRequest.allocation_id == allocationID
                 )
@@ -1340,6 +1346,12 @@ class FollowupRequestHandler(BaseHandler):
                 # allocation query required as only way to reach
                 # instrument_id is through allocation (as requests
                 # are associated to allocations, not instruments)
+                try:
+                    instrumentID = int(instrumentID)
+                except (TypeError, ValueError):
+                    return self.error(
+                        f"Invalid instrumentID: {instrumentID}; must be an integer"
+                    )
                 allocation_query = Allocation.select(session.user_or_token).where(
                     Allocation.instrument_id == instrumentID
                 )
@@ -1457,11 +1469,7 @@ class FollowupRequestHandler(BaseHandler):
                     - type: object
                       properties:
                         data:
-                          type: object
-                          properties:
-                            id:
-                              type: integer
-                              description: New follow-up request ID
+                          $ref: '#/components/schemas/FollowupRequest'
         """
         data = self.get_json()
 
@@ -1538,7 +1546,13 @@ class FollowupRequestHandler(BaseHandler):
           200:
             content:
               application/json:
-                schema: Success
+                schema:
+                  allOf:
+                    - $ref: '#/components/schemas/Success'
+                    - type: object
+                      properties:
+                        data:
+                          $ref: '#/components/schemas/FollowupRequest'
           400:
             content:
               application/json:
@@ -1740,7 +1754,13 @@ class FollowupRequestCommentHandler(BaseHandler):
           200:
             content:
               application/json:
-                schema: Success
+                schema:
+                  allOf:
+                    - $ref: '#/components/schemas/Success'
+                    - type: object
+                      properties:
+                        data:
+                          $ref: '#/components/schemas/FollowupRequest'
           400:
             content:
               application/json:
@@ -2502,7 +2522,13 @@ class FollowupRequestPrioritizationHandler(BaseHandler):
           200:
             content:
               application/json:
-                schema: Success
+                schema:
+                  allOf:
+                    - $ref: '#/components/schemas/Success'
+                    - type: object
+                      properties:
+                        data:
+                          $ref: '#/components/schemas/FollowupRequest'
           400:
             content:
               application/json:
@@ -2693,11 +2719,7 @@ class DefaultFollowupRequestHandler(BaseHandler):
                     - type: object
                       properties:
                         data:
-                          type: object
-                          properties:
-                            id:
-                              type: integer
-                              description: New default follow-up request ID
+                          $ref: '#/components/schemas/DefaultFollowupRequest'
         """
         data = self.get_json()
 

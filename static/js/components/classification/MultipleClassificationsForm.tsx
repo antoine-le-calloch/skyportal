@@ -19,7 +19,7 @@ import { withStyles } from "tss-react/mui";
 import { showNotification } from "baselayer/components/Notifications";
 import Button from "../Button";
 import { getSortedClasses } from "./ShowClassification";
-import * as Actions from "../../ducks/source";
+import { useAddClassificationMutation } from "../../ducks/source";
 import * as ClassificationsActions from "../../ducks/classifications";
 import { useAppDispatch, useAppSelector } from "../../types/hooks";
 
@@ -103,6 +103,7 @@ const MultipleClassificationsForm = ({
 }: MultipleClassificationsFormProps) => {
   const { classes } = useStyles();
   const dispatch = useAppDispatch();
+  const [addClassification] = useAddClassificationMutation();
   const stateTaxonomy = useAppSelector(
     (state) => state["classifications"].taxonomy,
   );
@@ -364,7 +365,7 @@ const MultipleClassificationsForm = ({
 
   const handleSubmit = async () => {
     setSubmissionRequestInProcess(true);
-    const results: any[] = [];
+    const results: boolean[] = [];
 
     const classifications = formState[selectedTaxonomy?.id];
 
@@ -382,8 +383,12 @@ const MultipleClassificationsForm = ({
         if (groupId) {
           data.group_ids = [groupId];
         }
-        const result = await dispatch(Actions.addClassification(data));
-        results.push(result);
+        try {
+          await addClassification(data).unwrap();
+          results.push(true);
+        } catch {
+          results.push(false);
+        }
       },
     );
 
@@ -399,7 +404,7 @@ const MultipleClassificationsForm = ({
     setFormState(newFormState);
 
     setSubmissionRequestInProcess(false);
-    if (results.every((result: any) => result.status === "success")) {
+    if (results.every((result) => result)) {
       dispatch(showNotification("Classifications saved."));
     }
   };
