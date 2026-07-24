@@ -26,6 +26,7 @@ from .broker import (
     BrokerFilterModulesHandler,
     BrokerFiltersHandler,
     BrokerFilterTestHandler,
+    BrokerFilterValidateHandler,
     BrokerHandler,
     BrokerPhotometryHandler,
     BrokerSaveHandler,
@@ -213,6 +214,7 @@ from .sources_confirmed_in_gcn import (
 )
 from .spatial_catalog import SpatialCatalogASCIIFileHandler, SpatialCatalogHandler
 from .spectrum import (
+    BulkSpectraHandler,
     ObjSpectraHandler,
     SpectrumASCIIFileHandler,
     SpectrumASCIIFileParser,
