@@ -664,13 +664,13 @@ app:
     # section above (as well as other grid characteristics).
     GettingStarted:
       # Onboarding checklist + guided tour. Shown to every user until they
-      # dismiss it (persisted per-user); reopenable any time. Set show: false to
-      # disable it for a deployment.
+      # dismiss it (persisted per-user); resetting the page layout brings it
+      # back. Set show: false to disable it for a deployment.
       resizeable: true
       minW: 2
       layouts:
         xlg: [0, 0, 4, 3]
-        lg: [0, 0, 3, 3]
+        lg: [0, 0, 2, 3]
         md: [0, 0, 3, 3]
         sm: [0, 0, 6, 3]
         xs: [0, 0, 4, 3]
@@ -702,7 +702,7 @@ app:
       minW: 2
       layouts:
         xlg: [4, 0, 5, 3]
-        lg: [3, 0, 4, 3]
+        lg: [2, 0, 4, 3]
         md: [3, 0, 4, 3]
         sm: [3, 5, 3, 3]
         xs: [0, 9, 4, 3]
@@ -735,7 +735,7 @@ app:
       minW: 2
       layouts:
         xlg: [9, 0, 5, 3]
-        lg: [7, 0, 3, 3]
+        lg: [6, 0, 4, 3]
         md: [0, 3, 5, 3]
         sm: [0, 5, 3, 3]
         xs: [0, 6, 4, 3]
@@ -842,7 +842,7 @@ server:
   # nginx parameter which sets both the time in seconds before which
   # the server is considered unavailable and the subsequent period of
   # time the server will be unavailable
-  fail_timeout: 20
+  fail_timeout: 5
 
   # Rate limit: number of requests per second (see https://www.nginx.com/blog/rate-limiting-nginx/)
   rate_limit: 5
@@ -1065,13 +1065,11 @@ smtp:
 
 invitations:
   enabled: False # If debug_login=True above, invite tokens won't be used during auth
-  days_until_expiry: 3
+  days_until_expiry: 7
   disable_emailing: False # If True, the app will generate invite tokens but not send emails
-  email_subject: "You've been invited to collaborate on SkyPortal"
-  email_body_preamble: | # This can include HTML tags
-    Welcome to <b>SkyPortal</b>!
-    <br />
-    Some other text here.
+  email_subject: # Defaults to "You've been invited to collaborate on <app.title>"
+  # Optional HTML added above the invitation link, to say what this deployment is for
+  email_body_preamble: ""
 
 # Lets people without an account apply for one, from a form on the login page
 # and at /apply. Approving an application issues the invitation they sign up

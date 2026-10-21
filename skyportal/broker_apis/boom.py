@@ -231,6 +231,46 @@ def _scope_history(record, programids):
     return record
 
 
+def _passing_alerts(broker, survey, results):
+    """The passing alerts without cutouts, keyed by candid, fetched in one query."""
+    candids = [
+        int(doc["_id"]) if str(doc["_id"]).lstrip("-").isdigit() else doc["_id"]
+        for doc in results
+        if doc.get("_id") is not None
+    ]
+    if not candids:
+        return {}
+    try:
+        alerts = _request(
+            broker,
+            "POST",
+            "queries/find",
+            json={
+                "catalog_name": f"{survey}_alerts",
+                "filter": {"_id": {"$in": candids}},
+                "projection": {
+                    **NO_CUTOUT_PROJECTION,
+                    "properties": 0,
+                    "coordinates": 0,
+                },
+                "max_time_ms": 10000,
+            },
+        )
+    except Exception as e:
+        log(f"Could not fetch the passing alerts of a filter test: {e}")
+        return {}
+    by_candid = {}
+    for alert in alerts if isinstance(alerts, list) else []:
+        if survey == "DECAM":
+            alert = _decam_to_standard(alert)
+        candid = str(alert.get("_id"))
+        alert["_id"] = candid
+        if isinstance(alert.get("candidate"), dict):
+            alert["candidate"]["candid"] = candid
+        by_candid[candid] = alert
+    return by_candid
+
+
 def _decam_to_standard(record):
     """Expose a DECam alert's aperture photometry (``magap``, difference flux in
     uJy) under the names the shared save and the alert plot read."""
@@ -698,15 +738,20 @@ class BOOMBROKER(BrokerAPI):
         catalog = f"{survey}_alerts"
         ra, dec, radius = kwargs.get("ra"), kwargs.get("dec"), kwargs.get("radius")
         scope = {**_scope_filter(kwargs, survey), **_epoch_filter(kwargs)}
+        candid = kwargs.get("candid")
 
-        if object_id:
+        if object_id or candid:
+            if object_id:
+                match = {"objectId": _object_id_clause(object_id)}
+            else:
+                match = {"_id": int(candid) if str(candid).isdigit() else candid}
             result = _request(
                 broker,
                 "POST",
                 "queries/find",
                 json={
                     "catalog_name": catalog,
-                    "filter": {"objectId": _object_id_clause(object_id), **scope},
+                    "filter": {**match, **scope},
                     "projection": NO_CUTOUT_PROJECTION,
                     "max_time_ms": 10000,
                 },
@@ -735,7 +780,7 @@ class BOOMBROKER(BrokerAPI):
             if isinstance(result, list):
                 result = [_to_standard(survey, r) for r in result]
             return result
-        raise ValueError("Provide objectId, or ra+dec+radius.")
+        raise ValueError("Provide objectId, candid, or ra+dec+radius.")
 
     @staticmethod
     def get_alert(broker, alert_id, session, **kwargs):
@@ -1439,7 +1484,14 @@ class BOOMBROKER(BrokerAPI):
                     )
                 if len(results) >= limit:
                     break
-            return {**res, "results": results[:limit]} if isinstance(res, dict) else res
+            if not isinstance(res, dict):
+                return res
+            results = results[:limit]
+            return {
+                **res,
+                "results": results,
+                "alerts": _passing_alerts(broker, survey, results),
+            }
         if kwargs.get("sort_by"):
             payload.update(
                 {

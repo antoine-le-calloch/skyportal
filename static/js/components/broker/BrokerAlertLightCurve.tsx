@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 
-import CircularProgress from "@mui/material/CircularProgress";
+import Skeleton from "@mui/material/Skeleton";
 
-import { useGetBrokerAlertQuery } from "../../ducks/brokers";
+import { useGetBrokerObjectQuery } from "../../ducks/brokers";
 import VegaPlotAlert from "./VegaPlotAlert";
 
 interface BrokerAlertLightCurveProps {
@@ -21,9 +21,9 @@ const BrokerAlertLightCurve = ({
   objectId,
   jd,
 }: BrokerAlertLightCurveProps) => {
-  const { data, isFetching } = useGetBrokerAlertQuery({
+  const { data, isFetching } = useGetBrokerObjectQuery({
     brokerId,
-    alertId: objectId,
+    objectId,
   });
 
   const { values, jd: latestJd } = useMemo(() => {
@@ -60,7 +60,7 @@ const BrokerAlertLightCurve = ({
 
   const markedJd = jd ?? latestJd;
 
-  if (isFetching) return <CircularProgress size={24} />;
+  if (isFetching) return <Skeleton variant="rounded" height="16rem" />;
   if (!values.length || markedJd == null) return null;
 
   return (

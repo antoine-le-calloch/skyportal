@@ -38,7 +38,14 @@ class RecentSourcesHandler(BaseHandler):
         recent_sources_prefs = user_prefs.get("recentSources", {})
         recent_sources_prefs = {**default_prefs, **recent_sources_prefs}
 
-        max_num_sources = int(recent_sources_prefs["maxNumSources"])
+        try:
+            max_num_sources = int(recent_sources_prefs["maxNumSources"])
+            if max_num_sources < 0:
+                raise ValueError("must not be negative")
+        except (TypeError, ValueError) as e:
+            raise ValueError(
+                f"Invalid recentSources preference maxNumSources: {e}"
+            ) from e
         include_sitewide = recent_sources_prefs.get("includeSitewideSources", False)
         group_ids = get_list_typed(
             recent_sources_prefs.get("groupIds", []),
@@ -82,11 +89,11 @@ class RecentSourcesHandler(BaseHandler):
                     self.get_query_argument("teamID", None),
                     user_group_ids,
                 )
+                query_results = await RecentSourcesHandler.get_recent_source_ids(
+                    self.current_user, session, team_group_ids=team_group_ids
+                )
             except ValueError as e:
                 return self.error(str(e))
-            query_results = await RecentSourcesHandler.get_recent_source_ids(
-                self.current_user, session, team_group_ids=team_group_ids
-            )
             tags_result = await session.scalars(
                 ObjTag.select(session.user_or_token)
                 .options(
@@ -121,7 +128,9 @@ class RecentSourcesHandler(BaseHandler):
                 classifications_dict[classification.obj_id].append(classification)
 
             source_rows_result = await session.scalars(
-                Source.select(session.user_or_token)
+                Source.select(
+                    session.user_or_token, options=[selectinload(Source.group)]
+                )
                 .where(Source.obj_id.in_(list(set(query_results))))
                 .order_by(Source.obj_id, desc(Source.created_at))
             )
@@ -171,6 +180,16 @@ class RecentSourcesHandler(BaseHandler):
                         "recency_index": recency_index,
                         "tns_name": s.tns_name,
                         "tags": tags_dict.get(s.id, []),
+                        "groups": list(
+                            {
+                                row.group_id: {
+                                    "id": row.group_id,
+                                    "name": row.group.name,
+                                }
+                                for row in rows
+                                if row.active
+                            }.values()
+                        ),
                     }
                 )
 

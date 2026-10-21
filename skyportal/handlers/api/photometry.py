@@ -64,6 +64,7 @@ from ...models.schema import (
     PhotometryMag,
     PhotometryRangeQuery,
 )
+from ...utils import bandpass_wavelengths
 from ...utils.data_access import default_extra_share_group_ids
 from ...utils.extinction import calculate_extinction, deredden_flux
 from ...utils.naive_datetime import utcnow_naive
@@ -77,6 +78,8 @@ _, cfg = load_env()
 log = make_log("api/photometry")
 
 MAX_NUMBER_ROWS = 10000
+
+CACHED_WAVELENGTHS = bandpass_wavelengths.load()
 
 # Above this many newly-inserted points for one object, recompute its PhotStat
 # from the table (full_update) instead of incrementally adding each point — past
@@ -172,6 +175,9 @@ def get_effective_wavelength(bandpass_name, radius=None):
     float
         Effective wavelength of the bandpass.
     """
+    if radius is None and bandpass_name in CACHED_WAVELENGTHS:
+        return CACHED_WAVELENGTHS[bandpass_name]
+
     try:
         args = {}
         if radius is not None:
@@ -301,6 +307,8 @@ with astropy.utils.data.conf.set_temp("remote_timeout", 2):
 BANDPASSES_WAVELENGTHS = {
     bp: w for bp, w in BANDPASSES_WAVELENGTHS.items() if w is not None
 }
+if not CACHED_WAVELENGTHS:
+    bandpass_wavelengths.save(BANDPASSES_WAVELENGTHS)
 
 
 # this is a drop-in replacement for pandas pd.to_numeric
@@ -1027,13 +1035,11 @@ async def _redden_standardized_photometry(df, unique_oids, session):
             )
         a_lambda[(oid, filt)] = a
 
-    # observed_flux = corrected_flux * 10 ** (-0.4 * A_lambda)
-    factor = np.array(
-        [
-            10 ** (-0.4 * a_lambda[(oid, filt)])
-            for oid, filt in zip(df["obj_id"], df["filter"])
-        ]
+    a_per_row = np.array(
+        [a_lambda[(oid, filt)] for oid, filt in zip(df["obj_id"], df["filter"])]
     )
+    # observed_flux = corrected_flux * 10 ** (-0.4 * A_lambda)
+    factor = 10 ** (-0.4 * a_per_row)
     for col in (
         "standardized_flux",
         "standardized_fluxerr",
@@ -1042,6 +1048,9 @@ async def _redden_standardized_photometry(df, unique_oids, session):
     ):
         if col in df.columns:
             df[col] = df[col].to_numpy() * factor
+    # limiting_mag is stored in original_user_data and served as-is
+    if "limiting_mag" in df.columns:
+        df["limiting_mag"] = df["limiting_mag"].to_numpy() + a_per_row
     return df
 
 

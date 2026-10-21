@@ -1,3 +1,4 @@
+import sqlalchemy as sa
 from skyportal_py_models.filters import (
     FilterGetQuery,
     FilterPatchBody,
@@ -9,7 +10,7 @@ from sqlalchemy.orm import joinedload, load_only
 from baselayer.app.access import auth_or_token, permissions
 from baselayer.log import make_log
 
-from ...models import Broker, Filter
+from ...models import Broker, BrokerCredential, Filter
 from ..base import BaseHandler
 from .group import has_admin_access_for_group
 
@@ -28,6 +29,20 @@ LIST_FIELDS = (
     "created_at",
     "modified",
 )
+
+
+async def clear_filter_from_routing(filter_id, session):
+    """Drop a filter from every credential's routing; no foreign key does."""
+    rows = (await session.scalars(sa.select(BrokerCredential))).all()
+    for row in rows:
+        routing = row.topic_filter_ids or {}
+        pruned = {
+            topic: [fid for fid in ids if fid != filter_id]
+            for topic, ids in routing.items()
+        }
+        pruned = {topic: ids for topic, ids in pruned.items() if ids}
+        if pruned != routing:
+            row.topic_filter_ids = pruned
 
 
 def delete_filter_on_broker(broker, f, session):
@@ -133,6 +148,7 @@ class FilterHandler(BaseHandler):
                 group_id=body.group_id,
                 broker_id=body.broker_id,
                 altdata=body.altdata,
+                created_by_id=self.associated_user_object.id,
             )
             session.add(fil)
             await session.commit()
@@ -268,16 +284,19 @@ class FilterHandler(BaseHandler):
             if f is None:
                 return self.error(f"Cannot find a filter with ID: {filter_id}.")
 
-            if not await has_admin_access_for_group(
-                self.associated_user_object, f.group_id, session
+            if f.created_by_id != self.associated_user_object.id and not (
+                await has_admin_access_for_group(
+                    self.associated_user_object, f.group_id, session
+                )
             ):
                 return self.error(
-                    "Insufficient permissions: must be a group admin or system "
-                    "admin to delete a filter.",
+                    "Insufficient permissions: must be the filter's creator, a "
+                    "group admin or a system admin to delete a filter.",
                     status=403,
                 )
 
             delete_filter_on_broker(f.broker, f, session)
+            await clear_filter_from_routing(f.id, session)
             await session.delete(f)
             await session.commit()
             return self.success()

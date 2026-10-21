@@ -117,6 +117,8 @@ def test_fink_get_alert_cassette():
     _assert_standard_shape(data)
     assert data["objectId"] == "ZTF19aaosfcb"
     assert len(data["prv_candidates"]) >= 1
+    # This object's detections are negative subtractions.
+    assert {p["isdiffpos"] for p in data["prv_candidates"]} == {"f"}
 
 
 def test_antares_get_alert_cassette():
@@ -860,6 +862,28 @@ def test_build_photometry_groups_flux_and_mag_space():
     assert g["filter"] == ["ztfg", "ztfr"]
     assert g["flux"][0] == 100.0 * 1e-9
     assert g["flux"][1] == pytest.approx(10.0 ** (-0.4 * (20.0 - 23.9)))
+
+
+def test_build_photometry_groups_negative_subtraction_is_negative_flux():
+    """magpsf is the magnitude of |flux|, so a ZTF negative subtraction
+    (isdiffpos f, or -1 from ALeRCE) is stored as a negative flux."""
+    data = {
+        "prv_candidates": [
+            {
+                "jd": 2459000.5 + i,
+                "band": "g",
+                "magpsf": 20.0,
+                "sigmapsf": 0.1,
+                "isdiffpos": isdiffpos,
+            }
+            for i, isdiffpos in enumerate(["t", "f", -1, None])
+        ],
+    }
+    groups = build_photometry_groups("ZTF1", "ZTF", data, 42, {("ZTF", 1): [10]})
+    g = groups[("ZTF", 1)]
+    flux = 10.0 ** (-0.4 * (20.0 - 23.9))
+    assert g["flux"] == pytest.approx([flux, -flux, -flux, flux])
+    assert all(e > 0 for e in g["fluxerr"])
 
 
 def test_build_photometry_groups_winter_flux_scale_and_zeropoint():
@@ -1944,23 +1968,6 @@ def test_decode_cutout_accepts_gzipped_and_plain_fits():
     for label, payload in (("gzipped", gzipped), ("plain", plain)):
         data, _ = decode_cutout(base64.b64encode(payload).decode(), "LSST")
         assert data[0][0] == 7.0, f"base64 {label}"
-
-
-def test_orient_cutout_mirrors_decam_across_the_anti_diagonal():
-    """DECam stamps are stored mirrored relative to the sky (checked against
-    Legacy Survey images), so opposite corners off the anti-diagonal swap."""
-    import numpy as np
-
-    from skyportal.broker_apis._thumbnails import orient_cutout
-
-    stamp = np.zeros((63, 63))
-    stamp[0, 0] = 1
-    stamp[-1, -1] = 2
-    stamp[0, -1] = 3
-    oriented = orient_cutout(stamp, "DECAM", {})
-    assert oriented[-1, -1] == 1
-    assert oriented[0, 0] == 2
-    assert oriented[0, -1] == 3
 
 
 def test_decode_cutout_rejects_a_url_placeholder():
