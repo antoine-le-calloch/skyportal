@@ -5,9 +5,7 @@ import type { Theme } from "@mui/material/styles";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Checkbox from "@mui/material/Checkbox";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
 import Skeleton from "@mui/material/Skeleton";
-import Tooltip from "@mui/material/Tooltip";
 
 import ReactMarkdown from "react-markdown";
 
@@ -71,6 +69,9 @@ interface CommentThreadProps {
   origin?: "scanning" | undefined;
   pinned?: boolean;
   compact?: boolean;
+  sourceFilter?: string | undefined;
+  mergeLinked?: boolean;
+  onMergeLinkedChange?: ((merge: boolean) => void) | undefined;
 }
 
 const CommentThread = ({
@@ -89,6 +90,9 @@ const CommentThread = ({
   origin,
   pinned = false,
   compact = false,
+  sourceFilter,
+  mergeLinked = false,
+  onMergeLinkedChange,
 }: CommentThreadProps) => {
   const [hoverID, setHoverID] = useState<any>(null);
 
@@ -244,6 +248,12 @@ const CommentThread = ({
   const loading = comments == null;
   comments = (comments || []).filter(Boolean);
 
+  if (sourceFilter) {
+    comments = comments.filter(
+      (comment: any) => (comment.obj_id ?? objID) === sourceFilter,
+    );
+  }
+
   if (!includeBots && !channel) {
     comments = comments?.filter((comment: any) => comment.bot === false);
   }
@@ -392,22 +402,6 @@ const CommentThread = ({
                 }
                 onBlur={() => handleMouseLeave()}
               >
-                {/* Meta-object provenance: comment aggregated from a linked source */}
-                {obj_id && objID && obj_id !== objID && (
-                  <Tooltip title={`From linked source ${obj_id}`}>
-                    <Chip
-                      label={obj_id}
-                      size="small"
-                      variant="outlined"
-                      component="a"
-                      href={`/source/${obj_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      clickable
-                      sx={{ height: 18 }}
-                    />
-                  </Tooltip>
-                )}
                 <Comment
                   // Spectra comments are merged into the source thread, so the
                   // type comes from the comment itself when the API sends it.
@@ -419,6 +413,11 @@ const CommentThread = ({
                   compact={compact}
                   id={id}
                   objID={objID}
+                  linkedObjID={
+                    !sourceFilter && obj_id && objID && obj_id !== objID
+                      ? obj_id
+                      : null
+                  }
                   gcnEventID={gcnEventID}
                   earthquakeID={earthquakeID}
                   author={author}
@@ -442,11 +441,34 @@ const CommentThread = ({
           sx={{
             display: "flex",
             justifyContent: "flex-end",
+            gap: "0.75rem",
             padding: "0 0.75rem",
             "& .MuiFormControlLabel-root": { margin: 0, gap: "0.25rem" },
             "& .MuiCheckbox-root": { padding: "0.125rem" },
           }}
         >
+          {onMergeLinkedChange && (
+            <FormControlLabel
+              label={
+                <Box
+                  component="span"
+                  sx={{ fontSize: "0.75rem", color: "text.secondary" }}
+                >
+                  Matching sources&apos; comments
+                </Box>
+              }
+              control={
+                <Checkbox
+                  color="primary"
+                  size="small"
+                  onChange={(event) =>
+                    onMergeLinkedChange(event.target.checked)
+                  }
+                  checked={mergeLinked}
+                />
+              }
+            />
+          )}
           <FormControlLabel
             label={
               <Box
@@ -468,12 +490,14 @@ const CommentThread = ({
           />
         </Box>
       )}
-      {permissions?.includes("Comment") && resourceID[resourceType] && (
-        <CommentForm
-          addComment={addComment}
-          streamAccess={resourceType === "sources"}
-        />
-      )}
+      {permissions?.includes("Comment") &&
+        resourceID[resourceType] &&
+        (!sourceFilter || sourceFilter === objID) && (
+          <CommentForm
+            addComment={addComment}
+            streamAccess={resourceType === "sources"}
+          />
+        )}
     </Box>
   );
 };

@@ -58,8 +58,6 @@ const SourceHost = ({
         (name: string) => !sameName(name, host?.name),
       );
 
-  if (!host && !brokerHosts && nearby.length === 0) return null;
-
   const assigned: HostSummary | null = host && {
     name: host.name,
     heading: "Assigned",
@@ -77,6 +75,8 @@ const SourceHost = ({
   const broker = brokerHost && brokerHostSummary(brokerHost, brokerName);
   const otherBroker =
     assigned && broker && !sameName(broker.name, assigned.name);
+
+  if (!assigned && !broker && nearby.length === 0) return null;
 
   return (
     <Box
@@ -105,11 +105,6 @@ const SourceHost = ({
         )}
         {!assigned && broker && (
           <HostChip host={{ ...broker, primary: true }} />
-        )}
-        {!assigned && !broker && (
-          <Box component="span" sx={{ color: "text.secondary" }}>
-            None
-          </Box>
         )}
         {otherBroker && (
           <Group label={brokerName}>

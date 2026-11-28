@@ -41,6 +41,7 @@ import {
 import {
   useDeleteConversationMutation,
   useGetConversationsQuery,
+  useGetSourceQuery,
 } from "../../ducks/source";
 import ConfirmDeletionDialog from "../ConfirmDeletionDialog";
 import { INTERESTED_CHANNEL, MAIN_CHANNEL } from "./channels";
@@ -48,6 +49,8 @@ import { pillTabsSx } from "./chatStyles";
 
 const CommentThread = lazy(() => import("./CommentThread"));
 const AssistantThread = lazy(() => import("./AssistantThread"));
+
+const LINKED_TAB = "linked:";
 
 const centeredSx = {
   display: "flex",
@@ -128,6 +131,7 @@ const CommentPanel = ({ inline = false }: CommentPanelProps) => {
     null,
   );
   const [channelToDelete, setChannelToDelete] = useState<string | null>(null);
+  const [mergeLinked, setMergeLinked] = useState(false);
   const downSm = useMediaQuery((theme: any) => theme.breakpoints.down("sm"));
   const [fab, setFab] = useState(() => {
     const [right = NaN, bottom = NaN] = (
@@ -172,6 +176,20 @@ const CommentPanel = ({ inline = false }: CommentPanelProps) => {
   const [renameAssistantConversation] =
     useRenameAssistantConversationMutation();
 
+  const { data: targetSource } = useGetSourceQuery(
+    target?.type === "source" && isComments && visible ? target.id : skipToken,
+  );
+  const linkedIDs: string[] =
+    target?.type === "source"
+      ? [
+          ...new Set<string>(
+            ((targetSource as any)?.comments ?? [])
+              .map((comment: any) => comment.obj_id)
+              .filter((id: string) => id && id !== target.id),
+          ),
+        ]
+      : [];
+
   const hasInterested =
     openedChannels.includes(INTERESTED_CHANNEL) ||
     channel === INTERESTED_CHANNEL;
@@ -180,6 +198,7 @@ const CommentPanel = ({ inline = false }: CommentPanelProps) => {
     target?.type === "source"
       ? [
           MAIN_CHANNEL,
+          ...(mergeLinked ? [] : linkedIDs.map((id) => `${LINKED_TAB}${id}`)),
           ...(hasInterested ? [INTERESTED_CHANNEL] : []),
           ...new Set(
             [...openedChannels, ...added.comments].filter(
@@ -215,6 +234,11 @@ const CommentPanel = ({ inline = false }: CommentPanelProps) => {
     : assistantChannel && chats.includes(assistantChannel)
       ? assistantChannel
       : chats[0];
+
+  const linkedTab =
+    isComments && activeChannel?.startsWith(LINKED_TAB)
+      ? activeChannel.slice(LINKED_TAB.length)
+      : null;
 
   const selectChannel = (name: string | null) => {
     if (isComments) {
@@ -444,13 +468,15 @@ const CommentPanel = ({ inline = false }: CommentPanelProps) => {
           sx={pillTabsSx}
         >
           {channels.map((name) => {
-            const label =
-              isComments && name === MAIN_CHANNEL && targetLabel
+            const linked = isComments && name.startsWith(LINKED_TAB);
+            const label = linked
+              ? name.slice(LINKED_TAB.length)
+              : isComments && name === MAIN_CHANNEL && targetLabel
                 ? targetLabel
                 : name;
             const closable =
               !isComments ||
-              (name !== MAIN_CHANNEL && name !== INTERESTED_CHANNEL);
+              (name !== MAIN_CHANNEL && name !== INTERESTED_CHANNEL && !linked);
             return (
               <Tab
                 key={name}
@@ -581,7 +607,21 @@ const CommentPanel = ({ inline = false }: CommentPanelProps) => {
               key={activeChannel}
               objID={target.id}
               channel={
-                activeChannel === MAIN_CHANNEL ? undefined : activeChannel
+                activeChannel === MAIN_CHANNEL || linkedTab
+                  ? undefined
+                  : activeChannel
+              }
+              sourceFilter={
+                linkedTab ??
+                (activeChannel === MAIN_CHANNEL &&
+                linkedIDs.length > 0 &&
+                !mergeLinked
+                  ? target.id
+                  : undefined)
+              }
+              mergeLinked={mergeLinked}
+              onMergeLinkedChange={
+                linkedIDs.length > 0 ? setMergeLinked : undefined
               }
               origin={target.origin}
               pinned={activeChannel === INTERESTED_CHANNEL}
