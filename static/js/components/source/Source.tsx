@@ -1446,26 +1446,35 @@ const SourceContent = ({ source }: SourceContentProps) => {
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <div
-                className={classes.flexColumn}
-                style={{ overflow: "hidden" }}
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  overflow: "hidden",
+                }}
               >
-                {!isReadOnly && (
-                  <FollowupRequestForm
-                    obj_id={source.id}
-                    instrumentList={instrumentList}
-                    instrumentFormParams={instrumentFormParams}
-                    vlaRubinAlert={source.vla_rubin_alert}
-                    {...({ action: "createNew" } as any)}
-                  />
-                )}
                 <FollowupRequestLists
                   followupRequests={source.followup_requests}
                   instrumentList={instrumentList}
                   instrumentFormParams={instrumentFormParams}
                   showEmptyMessage={isReadOnly}
                 />
-              </div>
+                {!isReadOnly && (
+                  <>
+                    <Typography sx={{ fontWeight: 600 }}>
+                      New request
+                    </Typography>
+                    <FollowupRequestForm
+                      obj_id={source.id}
+                      instrumentList={instrumentList}
+                      instrumentFormParams={instrumentFormParams}
+                      vlaRubinAlert={source.vla_rubin_alert}
+                      {...({ action: "createNew" } as any)}
+                    />
+                  </>
+                )}
+              </Box>
             </AccordionDetails>
           </Accordion>
         </Grid>
@@ -1486,19 +1495,14 @@ const SourceContent = ({ source }: SourceContentProps) => {
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <div
-                className={classes.flexColumn}
-                style={{ overflow: "hidden" }}
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  overflow: "hidden",
+                }}
               >
-                {!isReadOnly && (
-                  <FollowupRequestForm
-                    obj_id={source.id}
-                    instrumentList={instrumentList}
-                    instrumentFormParams={instrumentFormParams}
-                    requestType="forced_photometry"
-                    {...({ action: "createNew" } as any)}
-                  />
-                )}
                 <FollowupRequestLists
                   followupRequests={source.followup_requests}
                   instrumentList={instrumentList}
@@ -1506,7 +1510,21 @@ const SourceContent = ({ source }: SourceContentProps) => {
                   requestType="forced_photometry"
                   showEmptyMessage={isReadOnly}
                 />
-              </div>
+                {!isReadOnly && (
+                  <>
+                    <Typography sx={{ fontWeight: 600 }}>
+                      New request
+                    </Typography>
+                    <FollowupRequestForm
+                      obj_id={source.id}
+                      instrumentList={instrumentList}
+                      instrumentFormParams={instrumentFormParams}
+                      requestType="forced_photometry"
+                      {...({ action: "createNew" } as any)}
+                    />
+                  </>
+                )}
+              </Box>
             </AccordionDetails>
           </Accordion>
         </Grid>

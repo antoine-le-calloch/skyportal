@@ -87,6 +87,20 @@ const followupTemplates = {
   FieldTemplate: FollowupFieldTemplate,
 };
 
+const FIELDS =
+  "& form.rjsf > .rjsf-field-object > .MuiFormControl-root > .MuiGrid-container";
+const formGridSx = {
+  [FIELDS]: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(16rem, 1fr))",
+    columnGap: 2,
+  },
+  [`${FIELDS} > .MuiGrid-root`]: { width: "auto", maxWidth: "none" },
+  [`${FIELDS} > .MuiGrid-root:has(.rjsf-field-array, textarea)`]: {
+    gridColumn: "1 / -1",
+  },
+};
+
 const defaultGroupIds = (allocation: any) =>
   allocation?.default_share_group_ids?.length
     ? allocation.default_share_group_ids
@@ -356,12 +370,13 @@ const FollowupRequestForm = ({
           />
         </Tooltip>
       </Box>
-      <div
+      <Box
         data-testid={
           isForcedPhotometry
             ? "forced-photometry-form"
             : "followup-request-form"
         }
+        sx={formGridSx}
       >
         {/* Remount per allocation so formData doesn't leak across instruments. */}
         <Form
@@ -375,7 +390,7 @@ const FollowupRequestForm = ({
           onSubmit={handleSubmit}
           disabled={isSubmitting}
         />
-      </div>
+      </Box>
       {isSubmitting && <CircularProgress />}
       <Dialog
         open={requestToConfirm !== null}
