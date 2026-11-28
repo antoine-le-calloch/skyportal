@@ -43,7 +43,7 @@ const WatcherButton = ({
         {isWatching ? (
           <StarIcon fontSize="small" sx={{ color: "warning.main" }} />
         ) : (
-          <StarBorderIcon fontSize="small" />
+          <StarBorderIcon fontSize="small" sx={{ color: "warning.main" }} />
         )}
       </IconButton>
     </Tooltip>

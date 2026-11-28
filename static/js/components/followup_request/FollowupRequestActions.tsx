@@ -18,12 +18,14 @@ import {
 
 const ActionButton = ({
   title,
+  color,
   loading = false,
   onClick,
   testId,
   children,
 }: {
   title: string;
+  color: "primary" | "error" | "success";
   loading?: boolean;
   onClick: () => void;
   testId?: string;
@@ -33,7 +35,12 @@ const ActionButton = ({
     <CircularProgress size={18} sx={{ m: "5px" }} />
   ) : (
     <Tooltip title={title}>
-      <IconButton size="small" onClick={onClick} data-testid={testId}>
+      <IconButton
+        size="small"
+        color={color}
+        onClick={onClick}
+        data-testid={testId}
+      >
         {children}
       </IconButton>
     </Tooltip>
@@ -95,6 +102,7 @@ const FollowupRequestActions = ({
       {methodsImplemented.delete && !isDeleted && (
         <ActionButton
           title="Delete"
+          color="error"
           loading={loading === "delete"}
           onClick={() =>
             run("delete", () => deleteFollowupRequest({ id, params }))
@@ -107,6 +115,7 @@ const FollowupRequestActions = ({
       {canRetrieve && (
         <ActionButton
           title="Retrieve"
+          color="success"
           loading={loading === "retrieve"}
           onClick={() => run("retrieve", retrieve)}
         >
@@ -116,6 +125,7 @@ const FollowupRequestActions = ({
       {methodsImplemented.submit && status.includes("failed to submit") && (
         <ActionButton
           title="Submit again"
+          color="success"
           loading={loading === "submit"}
           onClick={() =>
             run("submit", () =>
@@ -137,6 +147,7 @@ const FollowupRequestActions = ({
       {editable && !isDeleted && (
         <ActionButton
           title="Edit"
+          color="primary"
           onClick={() => onEdit(id)}
           testId={`editRequest_${id}`}
         >
