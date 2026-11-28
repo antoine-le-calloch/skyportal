@@ -67,9 +67,10 @@ const FollowupRequestLists = ({
 }: FollowupRequestListsProps) => {
   // Not in the cell: its DataGrid column is virtualized, a remount would close the dialog.
   const [requestIdToEdit, setRequestIdToEdit] = useState<number | null>(null);
-  const [columnVisibilityModels, setColumnVisibilityModels] = useState<
-    Record<string, any>
-  >({});
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState<Record<
+    string,
+    boolean
+  > | null>(null);
 
   const [schema, otherSchema] =
     requestType === "triggered"
@@ -97,99 +98,123 @@ const FollowupRequestLists = ({
   const instLookUp = Object.fromEntries(
     instruments.map((inst: any) => [inst.id, inst]),
   );
-  const requestsGroupedByInstId = requests.reduce(
-    (grouped: any, request: any) => {
-      (grouped[request.allocation.instrument.id] ||= []).push(request);
-      return grouped;
-    },
-    {},
+  const rows = [...requests].sort((a, b) =>
+    a.created_at < b.created_at ? 1 : -1,
   );
+  const instrumentIds = [
+    ...new Set<number>(rows.map((row) => row.allocation.instrument_id)),
+  ];
+  const keys = [
+    ...new Set<string>(rows.flatMap((row) => Object.keys(row.payload))),
+  ].sort(keyOrder);
+  const formParamsList = instrumentIds
+    .map((id) => instrumentFormParams[id])
+    .filter(Boolean);
 
-  const getDataTableColumns = (keys: string[], instrument_id: string) => {
-    const baseColumns = [
-      statusColumn,
-      requestedColumn,
-      requesterColumn,
-      groupColumn,
-      allocationColumn,
-    ];
-    const formParams = instrumentFormParams[instrument_id];
-    if (!formParams) return { columns: baseColumns, defaultVisibility: {} };
-    const defaultVisibility: Record<string, boolean> = { Transactions: false };
-    const { methodsImplemented } = formParams;
-    const editable = methodsImplemented.update && requestType === "triggered";
-    const columns: any[] = [
-      {
-        field: "actions",
-        headerName: "Actions",
-        renderHeader: () => null,
-        width: 120,
-        hideable: false,
-        sortable: false,
-        filterable: false,
-        disableColumnMenu: true,
-        renderCell: ({ row }: any) => (
+  const defaultVisibility: Record<string, boolean> = { Transactions: false };
+  const columns: any[] = [
+    {
+      field: "actions",
+      headerName: "Actions",
+      renderHeader: () => null,
+      width: 150,
+      hideable: false,
+      sortable: false,
+      filterable: false,
+      disableColumnMenu: true,
+      renderCell: ({ row }: any) => {
+        const methodsImplemented =
+          instrumentFormParams[row.allocation.instrument_id]
+            ?.methodsImplemented ?? {};
+        return (
           <Box sx={{ display: "flex", alignItems: "center", height: "100%" }}>
             <WatcherButton followupRequest={row} />
             <FollowupRequestActions
               request={row}
               methodsImplemented={methodsImplemented}
-              editable={editable}
+              editable={
+                !!methodsImplemented.update && requestType === "triggered"
+              }
               refresh={false}
               onEdit={setRequestIdToEdit}
             />
           </Box>
-        ),
+        );
       },
-      ...baseColumns,
-    ];
+    },
+    {
+      field: "instrument",
+      headerName: "Instrument",
+      minWidth: 110,
+      hideable: false,
+      valueGetter: (_value: any, row: any) =>
+        instLookUp[row.allocation.instrument_id]?.name ??
+        row.allocation.instrument?.name,
+      renderCell: ({ value }: any) => (
+        <Box component="span" sx={{ fontWeight: 600 }}>
+          {value}
+        </Box>
+      ),
+    },
+    statusColumn,
+    requestedColumn,
+    requesterColumn,
+    groupColumn,
+    allocationColumn,
+  ];
 
-    if (formParams.formSchema?.properties?.station_name) {
-      columns.push({
-        field: "station",
-        headerName: "Station",
-        flex: 1,
-        minWidth: 120,
-        sortable: false,
-        filterable: false,
-        valueGetter: (_value: any, row: any) => row?.payload?.station_name,
-      });
-    }
-
-    keys.forEach((key) => {
-      const headerName = formParams.aliasLookup[key] ?? key;
-      const field = `payload.${key}`;
-      columns.push({
-        field,
-        headerName,
-        flex: 1,
-        minWidth: 120,
-        sortable: false,
-        filterable: false,
-        valueGetter: (_value: any, row: any) => {
-          const value = row.payload?.[key];
-          return Array.isArray(value) && !value.some(isObject)
-            ? value.join(",")
-            : value;
-        },
-        renderCell: ({ value }: any) =>
-          isObject(value) ? <JsonCell data={value} /> : String(value ?? ""),
-      });
-      if (!DISPLAYED_COLUMNS.includes(headerName.toLowerCase())) {
-        defaultVisibility[field] = false;
-      }
+  if (
+    formParamsList.some((params) => params.formSchema?.properties?.station_name)
+  ) {
+    columns.push({
+      field: "station",
+      headerName: "Station",
+      flex: 1,
+      minWidth: 120,
+      sortable: false,
+      filterable: false,
+      valueGetter: (_value: any, row: any) => row?.payload?.station_name,
     });
+  }
 
-    columns.push(transactionsColumn);
-    return { columns, defaultVisibility };
-  };
+  keys.forEach((key) => {
+    const headerName =
+      formParamsList.map((params) => params.aliasLookup?.[key]).find(Boolean) ??
+      key;
+    const field = `payload.${key}`;
+    columns.push({
+      field,
+      headerName,
+      flex: 1,
+      minWidth: 120,
+      sortable: false,
+      filterable: false,
+      valueGetter: (_value: any, row: any) => {
+        const value = row.payload?.[key];
+        return Array.isArray(value) && !value.some(isObject)
+          ? value.join(",")
+          : value;
+      },
+      renderCell: ({ value }: any) =>
+        isObject(value) ? <JsonCell data={value} /> : String(value ?? ""),
+    });
+    if (!DISPLAYED_COLUMNS.includes(headerName.toLowerCase())) {
+      defaultVisibility[field] = false;
+    }
+  });
+
+  columns.push(transactionsColumn);
 
   const requestToEdit = requests.find(
     (request: any) => request.id === requestIdToEdit,
   );
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box
+      data-testid={instrumentIds
+        .map((id) => `${id}_followupRequestsTable`)
+        .join(" ")}
+    >
       {requestToEdit && (
         <EditFollowupRequestDialog
           followupRequest={requestToEdit}
@@ -198,64 +223,30 @@ const FollowupRequestLists = ({
           requestType={requestType}
         />
       )}
-      {Object.entries(requestsGroupedByInstId).map(
-        ([instrument_id, instrumentRequests]: [string, any]) => {
-          const keys = [
-            ...new Set<string>(
-              instrumentRequests.flatMap((request: any) =>
-                Object.keys(request.payload),
-              ),
-            ),
-          ].sort(keyOrder);
-          const { columns, defaultVisibility } = getDataTableColumns(
-            keys,
-            instrument_id,
-          );
-
-          return (
-            <Box key={instrument_id}>
-              <Box
-                data-testid={`${instrument_id}-requests-header`}
-                sx={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  gap: 1,
-                  mb: 0.75,
-                }}
-              >
-                <Typography sx={{ fontWeight: 600 }}>
-                  {instLookUp[instrument_id]?.name}
-                </Typography>
-                <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                  {instrumentRequests.length}{" "}
-                  {instrumentRequests.length === 1 ? "request" : "requests"}
-                </Typography>
-              </Box>
-              <Box data-testid={`${instrument_id}_followupRequestsTable`}>
-                <StyledDataGrid
-                  height="auto"
-                  getRowHeight={() => "auto"}
-                  sx={PLAIN_LINKS_SX}
-                  rows={instrumentRequests}
-                  columns={columns}
-                  columnVisibilityModel={
-                    columnVisibilityModels[instrument_id] ?? defaultVisibility
-                  }
-                  onColumnVisibilityModelChange={(model: any) =>
-                    setColumnVisibilityModels((prev) => ({
-                      ...prev,
-                      [instrument_id]: model,
-                    }))
-                  }
-                  slots={{ toolbar: FollowupRequestListToolbar }}
-                  showToolbar
-                  hideFooter={instrumentRequests.length <= 25}
-                />
-              </Box>
-            </Box>
-          );
-        },
-      )}
+      <StyledDataGrid
+        height="auto"
+        density="compact"
+        getRowHeight={() => "auto"}
+        sx={[
+          PLAIN_LINKS_SX,
+          {
+            "& .MuiDataGrid-row--dynamicHeight > .MuiDataGrid-cell": {
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            },
+          },
+        ]}
+        rows={rows}
+        columns={columns}
+        columnVisibilityModel={columnVisibilityModel ?? defaultVisibility}
+        onColumnVisibilityModelChange={setColumnVisibilityModel}
+        initialState={{ pagination: { paginationModel: { pageSize: 5 } } }}
+        pageSizeOptions={[5, 10, 25]}
+        hideFooter={rows.length <= 5}
+        slots={{ toolbar: FollowupRequestListToolbar }}
+        showToolbar
+      />
     </Box>
   );
 };
