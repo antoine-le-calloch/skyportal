@@ -9,21 +9,27 @@ from skyportal_py_models.sharing_services import (
 from sqlalchemy.orm import joinedload, selectinload, undefer
 
 from baselayer.app.access import auth_or_token
+from baselayer.app.env import load_env
 
 from ....models import (
     Classification,
+    Group,
     GroupClassification,
     Instrument,
     Obj,
     SharingService,
     SharingServiceGroup,
     SharingServiceSubmission,
+    Source,
     Spectrum,
 )
+from ....utils.data_access import tns_report_group_ids
 from ....utils.naive_datetime import utcnow_naive
 from ....utils.parse import is_null
 from ....utils.tns import missing_spectrum_credits, tns_classification_id
 from ...base import BaseHandler
+
+_, cfg = load_env()
 
 
 def _report(submission):
@@ -48,10 +54,10 @@ def _tns_classification(obj):
     return object_type.get("name") if isinstance(object_type, dict) else None
 
 
-def _reports_automatically(classification, service_groups):
+def _reports_automatically(classification, group_ids, service_groups):
     for service_group in service_groups:
         if (
-            service_group.group_id in {g.id for g in classification.groups}
+            service_group.group_id in group_ids
             and service_group.auto_share_classifications_to_tns
             and classification.author_id
             in {p.user_id for p in service_group.auto_publishers}
@@ -64,7 +70,9 @@ def _reports_automatically(classification, service_groups):
     return False
 
 
-def _not_reported_reason(obj, classification, spectrum, submissions, service_groups):
+def _not_reported_reason(
+    obj, classification, group_ids, spectrum, submissions, service_groups
+):
     queued = next((s for s in submissions if _is_queued(s)), None)
     if queued is not None:
         if queued.tns_status == "processing":
@@ -84,7 +92,7 @@ def _not_reported_reason(obj, classification, spectrum, submissions, service_gro
     missing = missing_spectrum_credits(spectrum)
     if missing:
         return "missing_credits", f"Spectrum has no {', '.join(missing)}"
-    if not _reports_automatically(classification, service_groups):
+    if not _reports_automatically(classification, group_ids, service_groups):
         return "manual", "Manual report needed"
     if not spectrum.auto_report_to_tns:
         return "manual", "Manual report needed: spectrum not opted in"
@@ -128,6 +136,7 @@ class TNSClassificationsHandler(BaseHandler):
             )
             service_names = {s.id: s.name for s in services}
             service_groups = [g for s in services for g in s.groups]
+            service_group_ids = [g.group_id for g in service_groups]
 
             submissions = (
                 (
@@ -227,12 +236,30 @@ class TNSClassificationsHandler(BaseHandler):
                                 Classification.probability > 0,
                             ),
                             Classification.created_at >= since,
-                            Classification.id.in_(
-                                sa.select(GroupClassification.classification_id).where(
-                                    GroupClassification.group_id.in_(
-                                        [g.group_id for g in service_groups]
+                            sa.or_(
+                                Classification.id.in_(
+                                    sa.select(
+                                        GroupClassification.classification_id
+                                    ).where(
+                                        GroupClassification.group_id.in_(
+                                            service_group_ids
+                                        )
                                     )
-                                )
+                                ),
+                                sa.and_(
+                                    Classification.id.in_(
+                                        sa.select(GroupClassification.classification_id)
+                                        .join(Group)
+                                        .where(
+                                            Group.name == cfg["misc.public_group_name"]
+                                        )
+                                    ),
+                                    sa.exists().where(
+                                        Source.obj_id == Classification.obj_id,
+                                        Source.active.is_(True),
+                                        Source.group_id.in_(service_group_ids),
+                                    ),
+                                ),
                             ),
                         )
                         .order_by(Classification.created_at.desc())
@@ -255,6 +282,13 @@ class TNSClassificationsHandler(BaseHandler):
                 .unique()
                 .all()
             }
+            saved_group_ids = {}
+            for obj_id, group_id in await session.execute(
+                sa.select(Source.obj_id, Source.group_id).where(
+                    Source.obj_id.in_(list(latest)), Source.active.is_(True)
+                )
+            ):
+                saved_group_ids.setdefault(obj_id, set()).add(group_id)
             obj_submissions = {}
             for submission in (
                 await session.scalars(
@@ -311,8 +345,17 @@ class TNSClassificationsHandler(BaseHandler):
                 ):
                     continue
                 spectrum = spectra.get(obj_id)
+                saved = saved_group_ids.get(obj_id, set())
+                group_ids = saved.intersection(
+                    tns_report_group_ids(classification, saved)
+                )
                 reason_code, reason = _not_reported_reason(
-                    obj, classification, spectrum, submissions, service_groups
+                    obj,
+                    classification,
+                    group_ids,
+                    spectrum,
+                    submissions,
+                    service_groups,
                 )
                 queued = next((s for s in submissions if _is_queued(s)), None)
                 not_reported.append(
