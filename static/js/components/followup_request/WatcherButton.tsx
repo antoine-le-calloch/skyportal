@@ -38,11 +38,13 @@ const WatcherButton = ({
   };
 
   return (
-    <Tooltip
-      title={`click to ${isWatching ? "stop following" : "follow"} this request`}
-    >
-      <IconButton onClick={toggleWatch} disabled={isSubmitting} size="large">
-        {isWatching ? <StarIcon /> : <StarBorderIcon />}
+    <Tooltip title={isWatching ? "Stop following" : "Follow"}>
+      <IconButton onClick={toggleWatch} disabled={isSubmitting} size="small">
+        {isWatching ? (
+          <StarIcon fontSize="small" sx={{ color: "warning.main" }} />
+        ) : (
+          <StarBorderIcon fontSize="small" />
+        )}
       </IconButton>
     </Tooltip>
   );

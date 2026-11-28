@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 
 import { showNotification } from "baselayer/components/Notifications";
 import { useAppDispatch } from "../../types/hooks";
@@ -9,25 +15,28 @@ import {
   useEditFollowupRequestMutation,
   useLazyGetPhotometryRequestQuery,
 } from "../../ducks/source";
-import Button from "../Button";
 
 const ActionButton = ({
+  title,
   loading = false,
   onClick,
   testId,
   children,
 }: {
+  title: string;
   loading?: boolean;
   onClick: () => void;
   testId?: string;
-  children: string;
+  children: ReactNode;
 }) =>
   loading ? (
-    <CircularProgress size={24} />
+    <CircularProgress size={18} sx={{ m: "5px" }} />
   ) : (
-    <Button primary size="small" onClick={onClick} data-testid={testId}>
-      {children}
-    </Button>
+    <Tooltip title={title}>
+      <IconButton size="small" onClick={onClick} data-testid={testId}>
+        {children}
+      </IconButton>
+    </Tooltip>
   );
 
 interface FollowupRequestActionsProps {
@@ -82,28 +91,31 @@ const FollowupRequestActions = ({
     (status.startsWith("pending") || status.startsWith("submitted"));
 
   return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, py: 0.5 }}>
+    <Box sx={{ display: "flex", alignItems: "center" }}>
       {methodsImplemented.delete && !isDeleted && (
         <ActionButton
+          title="Delete"
           loading={loading === "delete"}
           onClick={() =>
             run("delete", () => deleteFollowupRequest({ id, params }))
           }
           testId={`deleteRequest_${id}`}
         >
-          Delete
+          <DeleteOutlinedIcon fontSize="small" />
         </ActionButton>
       )}
       {canRetrieve && (
         <ActionButton
+          title="Retrieve"
           loading={loading === "retrieve"}
           onClick={() => run("retrieve", retrieve)}
         >
-          Retrieve
+          <CloudDownloadOutlinedIcon fontSize="small" />
         </ActionButton>
       )}
       {methodsImplemented.submit && status.includes("failed to submit") && (
         <ActionButton
+          title="Submit again"
           loading={loading === "submit"}
           onClick={() =>
             run("submit", () =>
@@ -119,12 +131,16 @@ const FollowupRequestActions = ({
             )
           }
         >
-          Submit
+          <SendOutlinedIcon fontSize="small" />
         </ActionButton>
       )}
       {editable && !isDeleted && (
-        <ActionButton onClick={() => onEdit(id)} testId={`editRequest_${id}`}>
-          Edit
+        <ActionButton
+          title="Edit"
+          onClick={() => onEdit(id)}
+          testId={`editRequest_${id}`}
+        >
+          <EditOutlinedIcon fontSize="small" />
         </ActionButton>
       )}
     </Box>

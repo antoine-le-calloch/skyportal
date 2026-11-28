@@ -1,23 +1,20 @@
 import { useState } from "react";
-import Accordion from "@mui/material/Accordion";
-import AccordionDetails from "@mui/material/AccordionDetails";
-import AccordionSummary from "@mui/material/AccordionSummary";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 import StyledDataGrid, { DataGridToolbar } from "../StyledDataGrid";
 import JsonCell from "../JsonCell";
 import EditFollowupRequestDialog from "./EditFollowupRequestDialog";
 import FollowupRequestActions from "./FollowupRequestActions";
+import WatcherButton from "./WatcherButton";
 import {
   PLAIN_LINKS_SX,
   allocationColumn,
   groupColumn,
+  requestedColumn,
   requesterColumn,
   statusColumn,
   transactionsColumn,
-  watcherColumn,
 } from "./columns";
 
 const isObject = (value: any) => value !== null && typeof value === "object";
@@ -109,12 +106,43 @@ const FollowupRequestLists = ({
   );
 
   const getDataTableColumns = (keys: string[], instrument_id: string) => {
-    const columns: any[] = [requesterColumn, groupColumn, allocationColumn];
+    const baseColumns = [
+      statusColumn,
+      requestedColumn,
+      requesterColumn,
+      groupColumn,
+      allocationColumn,
+    ];
     const formParams = instrumentFormParams[instrument_id];
-    if (!formParams) return { columns, defaultVisibility: {} };
+    if (!formParams) return { columns: baseColumns, defaultVisibility: {} };
     const defaultVisibility: Record<string, boolean> = { Transactions: false };
     const { methodsImplemented } = formParams;
     const editable = methodsImplemented.update && requestType === "triggered";
+    const columns: any[] = [
+      {
+        field: "actions",
+        headerName: "Actions",
+        renderHeader: () => null,
+        width: 120,
+        hideable: false,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderCell: ({ row }: any) => (
+          <Box sx={{ display: "flex", alignItems: "center", height: "100%" }}>
+            <WatcherButton followupRequest={row} />
+            <FollowupRequestActions
+              request={row}
+              methodsImplemented={methodsImplemented}
+              editable={editable}
+              refresh={false}
+              onEdit={setRequestIdToEdit}
+            />
+          </Box>
+        ),
+      },
+      ...baseColumns,
+    ];
 
     if (formParams.formSchema?.properties?.station_name) {
       columns.push({
@@ -152,29 +180,7 @@ const FollowupRequestLists = ({
       }
     });
 
-    columns.push(statusColumn, transactionsColumn);
-
-    if (editable || methodsImplemented.delete || methodsImplemented.get) {
-      columns.push({
-        field: "modify",
-        headerName: "Modify",
-        flex: 1,
-        minWidth: 140,
-        sortable: false,
-        filterable: false,
-        renderCell: ({ row }: any) => (
-          <FollowupRequestActions
-            request={row}
-            methodsImplemented={methodsImplemented}
-            editable={editable}
-            refresh={false}
-            onEdit={setRequestIdToEdit}
-          />
-        ),
-      });
-    }
-
-    columns.push(watcherColumn(false));
+    columns.push(transactionsColumn);
     return { columns, defaultVisibility };
   };
 
@@ -183,7 +189,7 @@ const FollowupRequestLists = ({
   );
 
   return (
-    <Box sx={{ m: "0 1px 1px 1px" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {requestToEdit && (
         <EditFollowupRequestDialog
           followupRequest={requestToEdit}
@@ -207,24 +213,25 @@ const FollowupRequestLists = ({
           );
 
           return (
-            <Accordion
-              defaultExpanded
-              sx={{ width: "100%" }}
-              key={instrument_id}
-            >
-              <AccordionSummary
-                expandIcon={<ExpandMoreIcon />}
-                aria-controls={`${instLookUp[instrument_id]?.name}-requests`}
+            <Box key={instrument_id}>
+              <Box
                 data-testid={`${instrument_id}-requests-header`}
+                sx={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 1,
+                  mb: 0.75,
+                }}
               >
-                <Typography variant="subtitle1">
-                  {instLookUp[instrument_id]?.name} Requests
+                <Typography sx={{ fontWeight: 600 }}>
+                  {instLookUp[instrument_id]?.name}
                 </Typography>
-              </AccordionSummary>
-              <AccordionDetails
-                data-testid={`${instrument_id}_followupRequestsTable`}
-                sx={{ p: 0, m: 0 }}
-              >
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  {instrumentRequests.length}{" "}
+                  {instrumentRequests.length === 1 ? "request" : "requests"}
+                </Typography>
+              </Box>
+              <Box data-testid={`${instrument_id}_followupRequestsTable`}>
                 <StyledDataGrid
                   height="auto"
                   getRowHeight={() => "auto"}
@@ -242,9 +249,10 @@ const FollowupRequestLists = ({
                   }
                   slots={{ toolbar: FollowupRequestListToolbar }}
                   showToolbar
+                  hideFooter={instrumentRequests.length <= 25}
                 />
-              </AccordionDetails>
-            </Accordion>
+              </Box>
+            </Box>
           );
         },
       )}

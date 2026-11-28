@@ -1,10 +1,16 @@
 import { Link } from "react-router-dom";
 import Chip from "@mui/material/Chip";
 import Tooltip from "@mui/material/Tooltip";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import utc from "dayjs/plugin/utc";
 
 import JsonCell from "../JsonCell";
 import WatcherButton from "./WatcherButton";
 import { statusColor } from "./status";
+
+dayjs.extend(relativeTime);
+dayjs.extend(utc);
 
 export const PLAIN_LINKS_SX = {
   "& .MuiDataGrid-cell a:not(.MuiLink-root):not(.MuiButtonBase-root)": {
@@ -61,6 +67,7 @@ export const statusColumn = {
   headerName: "Status",
   flex: 1,
   minWidth: 150,
+  hideable: false,
   renderCell: ({ value }: any) => (
     <Tooltip title={value}>
       <Chip
@@ -72,6 +79,20 @@ export const statusColumn = {
       />
     </Tooltip>
   ),
+};
+
+export const requestedColumn = {
+  field: "created_at",
+  headerName: "Requested",
+  minWidth: 130,
+  renderCell: ({ value }: any) =>
+    value && (
+      <Tooltip
+        title={`${dayjs.utc(`${value}Z`).format("YYYY-MM-DD HH:mm")} UTC`}
+      >
+        <span>{dayjs.utc(`${value}Z`).fromNow()}</span>
+      </Tooltip>
+    ),
 };
 
 export const transactionsColumn = {
