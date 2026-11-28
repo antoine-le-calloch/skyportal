@@ -630,6 +630,13 @@ def classification_is_reportable(classification):
     return bool(classification.groups)
 
 
+def tns_report_group_ids(classification, saved_group_ids):
+    """A public classification counts for every group its source is saved to."""
+    if cfg["misc.public_group_name"] in {group.name for group in classification.groups}:
+        return saved_group_ids
+    return [group.id for group in classification.groups]
+
+
 def classes_under(hierarchy, parent, inside=False):
     """``parent`` and every class below it in a taxonomy hierarchy."""
     inside = inside or hierarchy.get("class") == parent
@@ -704,11 +711,10 @@ async def auto_classification_publishing_async(session, classification_id):
         sa.select(User).where(User.id == classification.author_id)
     )
     obj = classification.obj
-    group_ids = [group.id for group in classification.groups]
-    if cfg["misc.public_group_name"] in {group.name for group in classification.groups}:
-        group_ids = sa.select(Source.group_id).where(
-            Source.obj_id == obj.id, Source.active.is_(True)
-        )
+    saved_group_ids = sa.select(Source.group_id).where(
+        Source.obj_id == obj.id, Source.active.is_(True)
+    )
+    group_ids = tns_report_group_ids(classification, saved_group_ids)
 
     stmt = (
         SharingServiceGroup.select(author)
@@ -722,11 +728,7 @@ async def auto_classification_publishing_async(session, classification_id):
             SharingServiceGroup.group_id.in_(group_ids),
             SharingServiceGroup.auto_share_classifications_to_tns.is_(True),
             # the queue only reports a source saved to one of these groups
-            SharingServiceGroup.group_id.in_(
-                sa.select(Source.group_id).where(
-                    Source.obj_id == obj.id, Source.active.is_(True)
-                )
-            ),
+            SharingServiceGroup.group_id.in_(saved_group_ids),
             SharingServiceGroupAutoPublisher.group_user_id.in_(
                 sa.select(GroupUser.id).where(
                     GroupUser.user_id == author.id,
